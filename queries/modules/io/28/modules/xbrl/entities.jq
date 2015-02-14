@@ -98,7 +98,7 @@ declare function entities:eid($entities-or-ids as item*) as atomic*
     return
     typeswitch ($entity-or-id)
     case $entity as object return
-      let $id := ($entity._id[empty($entity.EIDs)], $entity.EIDs[])
+      let $id := ($entity._id, $entity.EIDs[])
       return if(exists($id))
              then $id
              else error(QName("entities:INVALID_PARAMETER"),

@@ -50,7 +50,7 @@
     "protractor-screenshot-reporter": "0.0.5",
     "q": "~1.0.1",
     "request": "~2.33.0",
-    "swagger-js-codegen": "0.5.0",
+    "swagger-js-codegen": "0.3.8",
     "upath": "^0.1.5"
   },
   "engines": {

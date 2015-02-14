@@ -3,7 +3,7 @@ import module namespace test = "http://apps.28.io/test";
 test:check-all-success({
     taxonomy-label: test:invoke-and-assert-deep-equal(
       "report-elements",
-      {aid:"STANDARD-TAXONOMY-2014", label:"Accounting policy for deferred assets"},
+      {aid:"STANDARD-TAXONOMY-2014", label:"\"Accounting policy for deferred assets\""},
       function($b as item*) as item* { $b.ReportElements },
       test:get-expected-result("edinet/report-elements-expected1.jq"),
       { NoArrayOrder: true }
@@ -17,7 +17,7 @@ test:check-all-success({
     ),
     company-label: test:invoke-and-assert-deep-equal(
       "report-elements",
-      {edinetcode:"E01225", label:"Loss of inactive facilities"},
+      {edinetcode:"E01225", label:"\"Loss of inactive facilities\""},
       function($b as item*) as item* { $b.ReportElements },
       test:get-expected-result("edinet/report-elements-expected3.jq"),
       { NoArrayOrder: true }
@@ -35,19 +35,5 @@ test:check-all-success({
       function($b as item*) as item* { document { $b/ReportElements } },
       test:get-expected-result-xml("edinet/report-elements-expected4-xml.jq"),
       { Format : "xml" }
-    ),
-    abstract-true : test:invoke-and-assert-deep-equal(
-      "report-elements",
-      {aid:"STANDARD-TAXONOMY-2014", abstract: "true", onlyNames: "true" },
-      function($b as item*) as item* { count($b.ReportElements[]) },
-      1027,
-      ()
-    ),
-    abstract-false : test:invoke-and-assert-deep-equal(
-      "report-elements",
-      {aid:"STANDARD-TAXONOMY-2014", abstract: "false", onlyNames: "true" },
-      function($b as item*) as item* { count($b.ReportElements[]) },
-      4771,
-      ()
     )
 })

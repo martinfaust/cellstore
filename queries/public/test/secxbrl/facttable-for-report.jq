@@ -6,40 +6,48 @@ import module namespace http-client = "http://zorba.io/modules/http-client";
 
 declare function local:expected-OtherOperatingIncomeExpenses-ATnT-2013() as object {
     {
-        "Aspects" : {
-          "sec:Accepted" : "20140221162554",
-          "xbrl28:Archive" : "0000732717-14-000010",
-          "sec:FiscalPeriod" : "FY",
-          "sec:FiscalYear" : 2013,
-          "sec:FiscalPeriodType" : "YTD",
-          "xbrl:Period" : "2013-01-01/2013-12-31",
-          "xbrl:Entity" : "http://www.sec.gov/CIK 0000732717",
-          "xbrl:Concept" : "fac:OtherOperatingIncomeExpenses",
-          "dei:LegalEntityAxis" : "sec:DefaultLegalEntity",
-          "sec:Archive" : "0000732717-14-000010"
+        "Aspects": {
+            "xbrl28:Archive": "0000732717-14-000010",
+            "xbrl:Concept": "fac:OtherOperatingIncomeExpenses",
+            "xbrl:Entity": "http://www.sec.gov/CIK 0000732717",
+            "xbrl:Period": "2013-01-01/2013-12-31",
+            "sec:FiscalPeriod": "FY",
+            "sec:FiscalPeriodType": "YTD",
+            "sec:FiscalYear": 2013,
+            "sec:Accepted": "20140221162554",
+            "dei:LegalEntityAxis": "sec:DefaultLegalEntity",
+            "sec:Archive" : "0000732717-14-000010"
         },
-        "KeyAspects" : [ "sec:Accepted", "xbrl:Period", "xbrl:Entity", "xbrl:Concept", "xbrl:Unit" ],
-        "Type" : "NumericValue",
-        "Value" : -145082000000,
-        "Decimals" : -6,
-        "Concept" : {
-          "Balance" : "CREDIT",
-          "PeriodType" : "duration",
-          "DataType" : "xbrli:monetaryItemType"
+        "KeyAspects": [
+            "xbrl:Concept",
+            "xbrl:Entity",
+            "xbrl:Period",
+            "xbrl:Unit",
+            "sec:Accepted"
+        ],
+        "Type": "NumericValue",
+        "Value": -145082000000,
+        "Decimals": -6,
+        "Concept": {
+            "Balance": "CREDIT",
+            "PeriodType": "duration",
+            "DataType": "xbrli:monetaryItemType"
         },
-        "AuditTrails" : [ {
-          "Id" : "bf2d1587-491c-4492-b587-ddd00d762f2d",
-          "Type" : "xbrl28:formula",
-          "Label" : "Other Operating Income (Expenses)",
-          "Message" : "fac:OtherOperatingIncomeExpenses[-145,082,000,000 USD] = fac:OperatingIncomeLoss[30,479,000,000 USD] - fac:GrossProfit[77,288,000,000 USD] - fac:OperatingExpenses[98,273,000,000 USD]",
-          "Data" : {
-            "OutputConcept" : "fac:OtherOperatingIncomeExpenses"
-          }
-        } ],
-        "xbrl28:Type" : "xbrl28:formula",
-        "EntityRegistrantName" : "AT&T INC.",
-        "Unit" : "iso4217:USD"
-      }
+        "AuditTrails": [
+            {
+                "Id": "bf2d1587-491c-4492-b587-ddd00d762f2d",
+                "Type": "xbrl28:formula",
+                "Label": "Other Operating Income (Expenses)",
+                "Message": "fac:OtherOperatingIncomeExpenses[-145,082,000,000 USD] = fac:OperatingIncomeLoss[30,479,000,000 USD] - fac:GrossProfit[77,288,000,000 USD] - fac:OperatingExpenses[98,273,000,000 USD]",
+                "Data": {
+                    "OutputConcept": "fac:OtherOperatingIncomeExpenses"
+                }
+            }
+        ],
+        "xbrl28:Type": "xbrl28:formula",
+        "EntityRegistrantName": "AT&T INC.",
+        "Unit": "iso4217:USD"
+    }
 };
 
 declare function local:compare-audit-trails($expected as array?, $actual as array?) as object* {

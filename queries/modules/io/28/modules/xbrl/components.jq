@@ -31,7 +31,6 @@ import module namespace networks = "http://28.io/modules/xbrl/networks";
 import module namespace resolution = "http://28.io/modules/xbrl/resolution";
 import module namespace layout = "http://28.io/modules/xbrl/layout";
 import module namespace hypercubes = "http://28.io/modules/xbrl/hypercubes";
-import module namespace labels = "http://28.io/modules/xbrl/labels";
 
 import module namespace accountant = "http://28.io/modules/xbrl/profiles/accountant/converter";
 
@@ -121,12 +120,6 @@ declare function components:components($component-or-ids as item*) as object*
  : @param $roles a sequence of component roles.
  : @param $concepts a sequence of concept names.
  : @param $exact-labels a sequence of exact labels to match.
- : @param $options Optional parameters:
- : <ul>
- :   <li>MetadataOnly: only return the Archive and Role fields.</li>
- :   <li>ExtraFilter a Mongo query to further filter components (mostly
- :   with profile-related filters)</li>
- : </ul>
  :
  : @error components:TOO-MANY-COMPONENTS if all parameters are set to ALL-*.
  :
@@ -147,8 +140,7 @@ declare function components:components-for(
     { "Archive" : { "$in" : [ $aids ] } }[not $aids = $components:ALL-ARCHIVES],
     { "Role" : { "$in" : [ $roles ] } }[not $roles = $components:ALL-ROLES],
     { "Concepts.Name" : { "$in" : [ $concepts ] } }[not $concepts = $components:ALL-CONCEPTS],
-    { "Concepts.Labels.Value" : { "$in" : [ $exact-labels ] } }[not $exact-labels = $components:ALL-LABELS],
-    $options.ExtraFilter treat as object?
+    { "Concepts.Labels.Value" : { "$in" : [ $exact-labels ] } }[not $exact-labels = $components:ALL-LABELS]
   |}
   return
     switch(true)
@@ -160,11 +152,12 @@ declare function components:components-for(
         QName("components:TOO-MANY-COMPONENTS"),
         "Too many components to be returned because no filtering is done."
       )
-    case $options.MetadataOnly
+    case $options.LabelsOnly
       return mw:find($components:col, $query, {
          "Archive" : 1,
-         "Role" : 1
-        }
+         "Role" : 1,
+         "Concepts.Labels" : 1,
+         "Concepts.Name" : 1 }
       )
     default return mw:find($components:col, $query)
 };
@@ -216,12 +209,16 @@ declare function components:components-for-archives-and-concepts(
     $concepts as string*) as object*
 {
     let $aids as string* := archives:aid($archives-or-ids)
-    let $concepts := concepts:concepts($concepts, $aids, $concepts:ANY_COMPONENT_LINK_ROLE)
+    let $concepts := mw:find($concepts:col,
+        {|
+            (
+                { "Name" : { "$in" : [ $concepts ] } },
+                { "Archive" : { "$in" : [ $aids ] } }
+            )
+        |})
     let $roles := $concepts.Role
     for $component in components:components-for-archives-and-roles($aids, $roles)
-    where (some $concept in $concepts satisfies
-        $concept.Archive eq $component.Archive and
-        $concept.Role eq $component.Role)
+    where (some $concept in $concepts satisfies $concept.Archive eq $component.Archive and $concept.Role eq $component.Role)
     return $component
 };
 
@@ -452,7 +449,7 @@ as object*
  :
  : @param $components sequence of components.
  :
- : @return the number of hypercubes
+ : @return the said number of hypercubes
  :)
 declare function components:num-hypercubes($components as object*) as integer*
 {
@@ -464,7 +461,7 @@ declare function components:num-hypercubes($components as object*) as integer*
  :
  : @param $components sequence of components.
  :
- : @return the number of networks
+ : @return the said number of networks
  :)
 declare function components:num-networks($components as object*) as integer*
 {
@@ -472,27 +469,27 @@ declare function components:num-networks($components as object*) as integer*
 };
 
 (:~
- : Return the number of report elements in each of the given components.
+ : Return the number of (distinct) explicit dimensions in each of the given components.
  :
  : @param $components sequence of components.
  :
- : @return the number of report elements
+ : @return the said number of dimensions
  :)
-declare function components:num-report-elements($components as object*) as integer*
+declare function components:num-explicit-dimensions($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumReportElements
+  $components ! $$.Statistics.NumDistinctExplicitDimensions
 };
 
 (:~
- : Return the number of (distinct) dimensions in each of the given components.
+ : Return the number of (distinct) domains in each of the given components.
  :
  : @param $components sequence of components.
  :
- : @return the number of dimensions
+ : @return the said number of domains
  :)
-declare function components:num-dimensions($components as object*) as integer*
+declare function components:num-domains($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumDimensions
+  $components ! $$.Statistics.NumDistinctDomains
 };
 
 (:~
@@ -504,43 +501,59 @@ declare function components:num-dimensions($components as object*) as integer*
  :)
 declare function components:num-members($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumMembers
+  $components ! $$.Statistics.NumDistinctMembers
 };
 
 (:~
- : Return the number of (distinct) concrete concepts in each of the given components.
+ : Return the number of (distinct) concrete primary items being
+ : in a hypercube for each of the given components.
  :
  : @param $components sequence of components.
  :
- : @return the said number of concepts
+ : @return the said number of primary items
  :)
-declare function components:num-concepts($components as object*) as integer*
+declare function components:num-concrete-primary-items-in-hypercubes($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumConcepts
+  $components ! $$.Statistics.NumDistinctConcretePrimaryItemsInHypercubes
 };
 
 (:~
- : Return the number of (distinct) abstract concepts in each of the given components.
+ : Return the number of (distinct) abstract primary items being
+ : in a hypercube for each of the given components.
  :
  : @param $components sequence of components.
  :
- : @return the said number of abstracts
+ : @return the said number of primary items
  :)
-declare function components:num-abstracts($components as object*) as integer*
+declare function components:num-abstract-primary-items-in-hypercubes($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumAbstracts
+  $components ! $$.Statistics.NumDistinctAbstractPrimaryItemsInHypercubes
 };
 
 (:~
- : Return the number of (distinct) line items report elements in each of the given components.
+ : Return the number of (distinct) concrete primary items not being
+ : in a hypercube for each of the given components.
  :
  : @param $components sequence of components.
  :
- : @return the said number of line items
+ : @return the said number of primary items
  :)
-declare function components:num-line-items($components as object*) as integer*
+declare function components:num-concrete-primary-items-not-in-hypercubes($components as object*) as integer*
 {
-  $components ! $$.Statistics.NumLineItems
+  $components ! $$.Statistics.NumDistinctConcretePrimaryItemsNotInHypercubes
+};
+
+(:~
+ : Return the number of (distinct) abstract primary items not being
+ : in a hypercube for each of the given components.
+ :
+ : @param $components sequence of components.
+ :
+ : @return the said number of primary items
+ :)
+declare function components:num-distinct-abstract-primary-items-not-in-hypercubes($components as object*) as integer*
+{
+  $components ! $$.Statistics.NumDistinctAbstractPrimaryItemsNotInHypercubes
 };
 
 (:~
@@ -575,16 +588,22 @@ declare function components:standard-typed-dimension-breakdown(
     $dimension-name as string,
     $options as object?) as object
 {
-    let $label as string? :=
-      labels:labels(
+    let $label as string := (
+      concepts:labels(
         $dimension-name,
-        ($labels:VERBOSE_LABEL_ROLE, $labels:STANDARD_LABEL_ROLE),
+        $concepts:VERBOSE_LABEL_ROLE,
         ($options.Language, $components.$components:DEFAULT-LANGUAGE)[1],
         $components.Concepts[],
-        (),
         $options
-      ).$dimension-name
-    let $label as string := ($label, $dimension-name)[1]
+      ),
+      concepts:labels(
+        $dimension-name,
+        $concepts:STANDARD_LABEL_ROLE,
+        ($options.Language, $components.$components:DEFAULT-LANGUAGE)[1],
+        $components.Concepts[],
+        $options
+      ),
+      $dimension-name)[1]
     return
     {
       BreakdownLabels: [ $label || " breakdown" ],
@@ -611,16 +630,22 @@ declare function components:standard-explicit-dimension-breakdown(
     $role as string,
     $options as object?) as object
 {
-    let $label as string? :=
-      labels:labels(
+    let $label as string := (
+      concepts:labels(
         $dimension-name,
-        ($labels:VERBOSE_LABEL_ROLE, $labels:STANDARD_LABEL_ROLE),
+        $concepts:VERBOSE_LABEL_ROLE,
         ($options.Language, $components.$components:DEFAULT-LANGUAGE)[1],
         $components.Concepts[],
-        (),
         $options
-      ).$dimension-name
-    let $label as string := ($label, $dimension-name)[1]
+      ),
+      concepts:labels(
+        $dimension-name,
+        $concepts:STANDARD_LABEL_ROLE,
+        ($options.Language, $components.$components:DEFAULT-LANGUAGE)[1],
+        $components.Concepts[],
+        $options
+      ),
+      $dimension-name)[1]
     return
     {
         BreakdownLabels: [ $label || " breakdown" ],
@@ -863,7 +888,22 @@ declare function components:merge($components as object*) as object
  :)
 declare function components:line-items($components as object*) as string*
 {
-    $components.Concepts[][$$.Kind eq "LineItems"].Name
+    let $presentation-networks as object* := networks:networks-for-components-and-short-names($components, "Presentation")
+    return components:line-items-recursive($components, $presentation-networks.Trees[])
+};
+
+declare %private function components:line-items-recursive($components as object*, $networks as object*) as string*
+{
+  let $concepts as object* := $components.Concepts[]
+  for $network in $networks
+  let $concept-name := $network.Name
+  let $substitution-group as string := $concepts[$$.Name eq $concept-name].SubstitutionGroup[1]
+  let $has-table-child as boolean := $concepts[$$.Name = $network.To[].Name].SubstitutionGroup = "xbrldt:hypercubeItem"
+  return switch(true)
+          case $has-table-child return components:line-items-recursive($components, $network.To[])
+          case $substitution-group eq "xbrldt:dimensionItem" return ()
+          case $substitution-group eq "xbrldt:hypercubeItem" return ()
+          default return $concept-name
 };
 
 (:~
@@ -875,7 +915,7 @@ declare function components:line-items($components as object*) as string*
  :)
 declare function components:hypercubes($components as object*) as string*
 {
-  $components.Concepts[][$$.Kind = "Hypercube"].Name
+  $components.Concepts[][$$.SubstitutionGroup = "xbrldt:hypercubeItem"].Name
 };
 
 (:~
@@ -887,19 +927,7 @@ declare function components:hypercubes($components as object*) as string*
  :)
 declare function components:dimensions($components as object*) as string*
 {
-  $components.Concepts[][$$.Kind = "Dimension"].Name
-};
-
-(:~
- : <p>Returns the member names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of member names.
- :)
-declare function components:members($components as object*) as string*
-{
-  $components.Concepts[][$$.Kind = "Member"].Name
+  $components.Concepts[][$$.SubstitutionGroup = "xbrldt:dimensionItem"].Name
 };
 
 (:~
@@ -909,94 +937,9 @@ declare function components:members($components as object*) as string*
  :
  : @return the sequence of concrete concept names.
  :)
-declare function components:concepts($components as object*) as string*
+declare function components:concrete-concepts($components as object*) as string*
 {
-  $components.Concepts[][$$.Kind = "Concept"].Name
-};
-
-(:~
- : <p>Returns the abstract concept names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of abstract concept names.
- :)
-declare function components:abstracts($components as object*) as string*
-{
-  $components.Concepts[][$$.Kind = "Abstract"].Name
-};
-
-(:~
- : <p>Returns the line items, that is the top-level abstracts or concepts in the
- : presentation network.</p>
- :
- : @param $components the input components.
- :
- : @return the line items report elements metadata objects.
- :)
-declare function components:line-items-metadata($components as object*) as object*
-{
-    $components.Concepts[][$$.Kind eq "LineItems"]
-};
-
-(:~
- : <p>Returns the hypercube names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of hypercube metadata objects.
- :)
-declare function components:hypercubes-metadata($components as object*) as object*
-{
-  $components.Concepts[][$$.Kind = "Hypercube"]
-};
-
-(:~
- : <p>Returns the dimension names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of dimension metadata objects.
- :)
-declare function components:dimensions-metadata($components as object*) as object*
-{
-  $components.Concepts[][$$.Kind = "Dimension"]
-};
-
-(:~
- : <p>Returns the member names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of member metadata objects.
- :)
-declare function components:members-metadata($components as object*) as object*
-{
-  $components.Concepts[][$$.Kind = "Member"]
-};
-
-(:~
- : <p>Returns the concrete concept names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of concrete concept metadata objects.
- :)
-declare function components:concepts-metadata($components as object*) as object*
-{
-  $components.Concepts[][$$.Kind = "Concept"]
-};
-
-(:~
- : <p>Returns the abstract concept names that are in the component.
- :
- : @param $components a sequence of components.
- :
- : @return the sequence of abstract concept metadata objects.
- :)
-declare function components:abstracts-metadata($components as object*) as object*
-{
-  $components.Concepts[][$$.Kind = "Abstract"]
+  $components.Concepts[][not $$.IsAbstract].Name
 };
 
 (:~
@@ -1028,26 +971,6 @@ declare %private function components:has-table(
 };
 
 (:~
- : <p>Checks whether all report elements have metadata.</p>
- :
- : @param $component a component.
- :
- : @return all report elements without metadata.
- :)
-declare %private function components:missing-metadata(
-    $component as object
-) as string*
-{
-  let $metadata-names := $component.Concepts[].Name
-  for $name in distinct-values((
-    descendant-objects($component.Networks).Name,
-    descendant-objects($component.Hypercubes).Name
-  ))
-  where not $name = $metadata-names
-  return $name
-};
-
-(:~
  : <p>Checks components for semantic validation errors.</p>
  :
  : @param $components a sequence of components.
@@ -1061,9 +984,6 @@ declare function components:validation-errors(
   for $component in $components
   return (
     "Presentation network is missing"[not components:has-presentation-network($component)],
-    "Hypercube is missing (implied table)"[not components:has-table($component)],
-    let $missing := components:missing-metadata($component)
-    where exists($missing)
-    return "Some metadata is missing (" || string-join($missing, ", ") || ")"
+    "Hypercube is missing (implied table)"[not components:has-table($component)]
   )
 };

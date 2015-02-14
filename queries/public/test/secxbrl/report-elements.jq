@@ -48,12 +48,16 @@ declare %an:sequential function local:check($o as object) as object
 
 local:check({
     all: local:test-concepts(3, {cik:"4962",name:"us-gaap:Assets"}),
-    onlyNames: local:test-concepts(16154, {tag:"DOW30",fiscalYear:"2012",fiscalPeriod:"FY",onlyNames:"true"}),
-    fac-assets: local:test-concepts(1, {ticker:"ko",fiscalYear:"2013",report:"FundamentalAccountingConcepts",name:"fac:Assets"}),
-    fac: local:test-concepts(50, {ticker:"ko",fiscalYear:"2013",report:"FundamentalAccountingConcepts"}),
-    disclosures: local:test-concepts(71, {ticker:"ko",fiscalYear:"2013",report:"Disclosures"}),
-    disclosures-1: local:test-concepts(1, {ticker:"ko",report:"Disclosures",fiscalYear:"2013",name:"disc:ScheduleOfComponentsOfIncomeTaxExpenseBenefitTableTextBlock"}),
+    onlyNames: local:test-concepts(16153, {tag:"DOW30",fiscalYear:"2012",fiscalPeriod:"FY",onlyNames:"true"}),
+    fac-assets-map: local:test-concepts(1, {ticker:"ko",fiscalYear:"2013",map:"FundamentalAccountingConcepts",name:"fac:Assets"}),
+    fac-assets-report: local:test-concepts(1, {ticker:"ko",fiscalYear:"2013",report:"FundamentalAccountingConcepts",name:"fac:Assets"}),
+    fac-map: local:test-concepts(50, {ticker:"ko",fiscalYear:"2013",map:"FundamentalAccountingConcepts"}),
+    fac-report: local:test-concepts(50, {ticker:"ko",fiscalYear:"2013",report:"FundamentalAccountingConcepts"}),
+    disclosures-map: local:test-concepts(71, {ticker:"ko",fiscalYear:"2013",map:"Disclosures"}),
+    disclosures-report: local:test-concepts(71, {ticker:"ko",fiscalYear:"2013",report:"Disclosures"}),
+    disclosures: local:test-concepts(1, {ticker:"ko",report:"Disclosures",fiscalYear:"2013",name:"disc:ScheduleOfComponentsOfIncomeTaxExpenseBenefitTableTextBlock"}),
     reportWithNoFilter: local:test-200({report:"Disclosures"}),
+    reportWithNoFilter2: local:test-200({map:"Disclosures"}),
     disclosures2: local:test-concepts(
         67,
         {ticker:"ko",fiscalYear:"2012",fiscalPeriod:"FY",report:"Disclosures"},

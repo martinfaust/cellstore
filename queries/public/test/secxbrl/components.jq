@@ -17,8 +17,21 @@ declare %an:nondeterministic function local:test-example1() as item
   let $endpoint := "components"
   let $request := test:invoke($endpoint, $params)
   let $actual := $request[2].Archives
+  return test:assert-deep-equal($expected, $actual, $request[1], test:url($endpoint, $params)) 
+};
+
+declare %an:nondeterministic function local:test-example2() as item
+{
+  let $expected := parse-json(
+        http-client:get("http://" || request:server-name() || ":" || request:server-port() ||
+                        "/test/secxbrl/components-expected2.jq").body.content)
+  let $params := {ticker:"ko"}
+  let $endpoint := "components"
+  let $request := test:invoke($endpoint, $params)
+  let $actual := $request[2].Archives
   return test:assert-deep-equal($expected, $actual, $request[1], test:url($endpoint, $params))
 };
+
 
 declare %an:nondeterministic function local:test-acceptance-date($expected as string, $params as object) as item
 {
@@ -104,11 +117,5 @@ local:check({
       aid: "0000021344-14-000008"
     }),
     example1: local:test-example1(),
-    example2: test:invoke-and-assert-deep-equal(
-      "components",
-      {ticker:"ko"},
-      function($b as item*) as item* { $b.Archives },
-      test:get-expected-result("secxbrl/components-expected2.jq"),
-      { NoArrayOrder: true }
-    )
+    example2: local:test-example2()
 })

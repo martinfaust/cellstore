@@ -257,15 +257,25 @@ declare function sec-networks:networks-for-filings-and-label(
 declare %private function sec-networks:model-structures-recursive(
     $component as object,
     $xbrl-concepts as object*,
+    $ancestor as string,
     $depth as integer)
     as object*
 {
   for $xbrl-concept in $xbrl-concepts
   order by $xbrl-concept.Order
   let $main-object := ($component.Concepts[])[$$.Name eq $xbrl-concept.Name]
-  let $kind := $main-object.Kind
+  let $kind :=
+      switch($main-object.SubstitutionGroup)
+      case "xbrldt:hypercubeItem" return "Table"
+      case "xbrldt:dimensionItem" return "Axis"
+      default return switch($ancestor)
+                     case "Table" return "LineItems"
+                     case "Axis"
+                     case "Member" return "Member"
+                     default return if ($main-object.IsAbstract) then "Abstract" else "Concept"
   return {|
     {
+      "Kind" : $kind,
       "Name" : $main-object.Name,
       "Label" : $main-object.Label,
       "Depth" : $depth
@@ -279,6 +289,7 @@ declare %private function sec-networks:model-structures-recursive(
     let $children := sec-networks:model-structures-recursive(
                          $component,
                          (values($xbrl-concept.To), $xbrl-concept.To[]),
+                         $kind,
                          $depth + 1
                      )
     return if (exists($children)) then { Children: [ $children ] } else ()
@@ -303,6 +314,7 @@ declare function sec-networks:model-structures($networks as object*) as object*
   return sec-networks:model-structures-recursive(
       $sec-network,
       $presentation-network.Trees[],
+      "None",
       1)
 };
 
@@ -449,7 +461,7 @@ declare function sec-networks:standard-definition-models-for-components($compone
           [not (($auto-slice-dimensions, $user-slice-dimensions) = "xbrl:Entity")]
     )
 
-    let $lineitems as string* := components:line-items($component)
+    let $lineitems as string* := sec-networks:line-items-report-elements($component).Name
     let $presentation-network as object? := networks:networks-for-components-and-short-names($component, "Presentation")
     let $roots as string* := distinct-values($presentation-network.Trees[].Name)
     let $lineitems as string* := if(exists($lineitems)) then $lineitems else $roots
@@ -480,6 +492,289 @@ declare function sec-networks:standard-definition-models-for-components($compone
 };
 
 (:~
+ : <p>Returns all SEC Tables contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Tables are XBRL hypercubes.</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ : @param $options <a href="core#standard_options">standard SEC BizQL options</a>.
+ :
+ : @return the SEC Tables.
+ :
+ :)
+declare function sec-networks:tables($networks as object*, $options as object?) as object*
+{
+  let $include-implied-table as boolean := if(exists($options("IncludeImpliedTable")))
+                                           then $options("IncludeImpliedTable")
+                                           else false
+  for $sec-network in $networks
+  let $hypercube-metadata as object* := ($sec-network.Concepts[])[$$.SubstitutionGroup eq "xbrldt:hypercubeItem"]
+  return if (exists($hypercube-metadata) or not $include-implied-table)
+         then $hypercube-metadata
+         else {
+           Name: "xbrl28:ImpliedTable",
+           Label: "BizQL SEC Implied Table"
+         }
+};
+
+(:~
+ : <p>Returns the names of all SEC Tables contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Tables are XBRL hypercubes.</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ : @param $options <a href="core#standard_options">standard SEC BizQL options</a>.
+ :
+ : @return the names of the SEC Tables.
+ :
+ :)
+declare function sec-networks:table-names($networks as object*) as string*
+{
+  let $names := $networks.Hypercubes[].Name
+  return if (exists($names)) then $names else "xbrl28:ImpliedTable"
+};
+
+(:~
+ : <p>Returns all SEC Tables contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Tables are XBRL hypercubes.</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ :
+ : @return the SEC Tables.
+ :
+ :)
+declare function sec-networks:tables($networks as object*) as object*
+{
+  sec-networks:tables($networks, ())
+};
+
+(:~
+ : <p>Returns all SEC Axes contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Axes are XBRL dimensions.</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ :
+ : @return the SEC Axes.
+ :
+ :)
+declare function sec-networks:axes($networks-or-ids as item*) as object*
+{
+  let $model-structure := sec-networks:model-structures($networks-or-ids)
+  for $object in
+    ($model-structure, descendant-objects($model-structure))[$$.Kind eq "Axis"]
+  group by $name := $object.Name
+  return trim($object[1], "Children")
+};
+
+(:~
+ : <p>Returns all SEC Members contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Members are XBRL members that are in the transitive closure of SEC Axes
+ : via the dimension-domain and domain-member relations.</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ :
+ : @return the SEC Members.
+ :
+ :)
+declare function sec-networks:members($networks-or-ids as item*) as object*
+{
+  let $model-structure := sec-networks:model-structures($networks-or-ids)
+  for $object in
+    ($model-structure, descendant-objects($model-structure))[$$.Kind eq "Member"]
+  group by $name := $object.Name
+  return trim($object[1], "Children")
+};
+
+(:~
+ : <p>Returns all SEC LineItems report elements contained in the supplied SEC Networks.</p>
+ : <p>This is not to be confused with the "line items" terminology, which includes all
+ : SEC Abstracts and SEC Concepts.</p>
+ :
+ : <p>SEC LineItems report elements are XBRL abstract primary items that are top-level in their
+ : association with an XBRL hypercube (source of an all relation).</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ :
+ : @return the SEC LineItems report elements.
+ :
+ :)
+declare function sec-networks:line-items-report-elements($networks-or-ids as item*) as object*
+{
+  let $model-structure := sec-networks:model-structures($networks-or-ids)
+  for $object in
+    ($model-structure, descendant-objects($model-structure))[$$.Kind eq "LineItems"]
+  group by $name := $object.Name
+  return trim($object[1], "Children")
+};
+
+(:~
+ : <p>Returns all SEC Abstracts contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Abstracts are XBRL abstract primary items that may or may not be associated
+ : with a hypercube -- except those that are SEC LineItems (i.e., source of an all relation).</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ :
+ : @return the SEC Abstracts.
+ :
+ :)
+declare function sec-networks:abstracts($networks as object*) as object*
+{
+  for $sec-network in $networks
+  let $abstract-metadata as object* := ($sec-network.Concepts[])
+    [not $$.SubstitutionGroup = ("xbrldt:hypercubeItem", "xbrldt:dimensionItem")][$$.IsAbstract]
+  let $tables := sec-networks:tables($sec-network)
+  let $presentation-network := networks:networks-for-components-and-short-names(
+      $sec-network,
+      $networks:PRESENTATION_NETWORK)
+  where not $abstract-metadata.Name
+      = descendant-objects($presentation-network)[$$.Name = $tables.Name].To[].Name
+  return $abstract-metadata
+};
+
+(:~
+ : <p>Returns all SEC Concepts contained in the supplied SEC Networks.</p>
+ :
+ : <p>SEC Concepts are XBRL concrete primary items that may or may not be associated
+ : with a hypercube.</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ :
+ : @return the SEC Concepts.
+ :
+ :)
+declare function sec-networks:concepts($networks as object*) as object*
+{
+  for $sec-network in $networks
+  let $concept-metadata as object* := ($sec-network.Concepts[])
+    [not $$.SubstitutionGroup = ("xbrldt:hypercubeItem", "xbrldt:dimensionItem")][not $$.IsAbstract]
+  return $concept-metadata
+};
+
+(:~
+ : <p>Returns all SEC Line Items (Concepts and Abstracts) contained in the
+ : supplied SEC Networks. Not to be confused with the LineItems report element.</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ :
+ : @return the SEC Line Items.
+ :
+ :)
+declare function sec-networks:line-items($networks-or-ids as item*) as object*
+{
+  let $model-structure := sec-networks:model-structures($networks-or-ids)
+  for $object in
+    ($model-structure, descendant-objects($model-structure))[$$.Kind = ("Concept", "Abstract")]
+  group by $name := $object.Name
+  return trim($object[1], "Children")
+};
+
+(:~
+ : Return the number of SEC Tables in each of the given components.
+ :
+ : @param $networks-or-ids list of components or IDs
+ :
+ : @return the said number of tables
+ :)
+declare function sec-networks:num-tables($networks-or-ids as item*) as integer*
+{
+  components:num-hypercubes($networks-or-ids)
+};
+
+(:~
+ : Return the number of (distinct) SEC report elements in each of the given components.
+ :
+ : @param $networks list of components.
+ :
+ : @return the said number of report elements
+ :)
+declare function sec-networks:num-report-elements($networks as object*) as integer*
+{
+  for $c in $networks
+  return sum(
+    (
+      components:num-concrete-primary-items-in-hypercubes($c),
+      components:num-abstract-primary-items-in-hypercubes($c),
+      components:num-concrete-primary-items-not-in-hypercubes($c),
+      components:num-distinct-abstract-primary-items-not-in-hypercubes($c)
+    )
+  )
+};
+
+(:~
+ : Return the number of (distinct) SEC Axes in each of the given components.
+ :
+ : @param $networks-or-ids list of components or IDs
+ :
+ : @return the said number of axes
+ :)
+declare function sec-networks:num-axes($networks-or-ids as item*) as integer*
+{
+  components:num-explicit-dimensions($networks-or-ids)
+};
+
+(:~
+ : Return the number of (distinct) SEC Members in each of the given components.
+ :
+ : @param $networks list of components.
+ :
+ : @return the said number of members
+ :)
+declare function sec-networks:num-members($networks as object*) as integer*
+{
+  for $c in $networks
+  return $c.Statistics.NumDistinctMembers
+};
+
+(:~
+ : Return the number of (distinct) SEC LineItems report elements in each of the given components.
+ :
+ : @param $networks list of components.
+ :
+ : @return the said number of line items
+ :)
+declare function sec-networks:num-line-items($networks as object*) as integer*
+{
+  $networks ! $$.Statistics.Profiles.SEC.NumDistinctReportElementNamesEndingWithLineItems
+};
+
+(:~
+ : Return the number of (distinct) SEC Abstracts in each of the given components.
+ :
+ : @param $networks list of components.
+ :
+ : @return the said number of abstracts
+ :)
+declare function sec-networks:num-abstracts($networks as object*) as integer*
+{
+  for $c in $networks
+  let $s := $c.Statistics
+  return  $s.NumDistinctAbstractPrimaryItemsInHypercubes
+          + $s.NumDistinctAbstractPrimaryItemsNotInHypercubes
+          - $s.Profiles.SEC.NumDistinctReportElementNamesEndingWithLineItems
+          - $s.NumDistinctDomains
+          - $s.NumDistinctMembers
+};
+
+(:~
+ : Return the number of (distinct) SEC Concepts in each of the given components.
+ :
+ : @param $networks list of components.
+ :
+ : @return the said number of concepts
+ :)
+declare function sec-networks:num-concepts($networks as object*) as integer*
+{
+  for $c in $networks
+  let $s := $c.Statistics
+  return  $s.NumDistinctConcretePrimaryItemsInHypercubes
+          + $s.NumDistinctConcretePrimaryItemsNotInHypercubes
+};
+
+(:~
  :
  : <p>Retrieves all facts belonging to the SEC Network.</p>
  :
@@ -498,6 +793,37 @@ as object*
  :
  : <p>Retrieves all facts belonging to the SEC Network.</p>
  :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ : @return a array populated with fact values.
+ :)
+declare function sec-networks:fact-tables(
+    $networks-or-ids as item*
+)
+as array
+{
+  sec-networks:fact-tables($networks-or-ids, ())
+};
+
+(:~
+ :
+ : <p>Retrieves all facts belonging to the SEC Networks and populates the model structures.</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ :
+ : @return the populated model structures (Facts array fields).
+ :)
+declare function sec-networks:populated-model-structures(
+    $networks-or-ids as item*
+)
+as object*
+{
+  sec-networks:populated-model-structures($networks-or-ids, ())
+};
+
+(:~
+ :
+ : <p>Retrieves all facts belonging to the SEC Network.</p>
+ :
  : @param $networks a sequence of SEC Network objects.
  : @param $options <a href="core#standard_options">standard SEC BizQL options</a>.
  :
@@ -510,12 +836,12 @@ declare function sec-networks:facts(
 as object*
 {
   for $component as object in $networks
-  for $table as string? allowing empty in components:hypercubes($component)[$$ ne "xbrl28:ImpliedTable"]
+  for $table as string? allowing empty in sec-networks:table-names($component)[$$ ne "xbrl28:ImpliedTable"]
   let $hypercube as object? := hypercubes:hypercubes-for-components($component, $table)
   let $hypercube as object := if (exists($hypercube))
                               then $hypercube
                               else sec:dimensionless-hypercube({
-                                  Concepts: [ components:concepts($component) ]
+                                  Concepts: [ sec-networks:line-items($component).Name ]
                               })
   let $facts := hypercubes:facts-for-hypercube(
     $hypercube,
@@ -529,6 +855,68 @@ as object*
     )
   )
   return sec:hide-amended-facts($facts, $options)
+};
+
+(:~
+ :
+ : <p>Retrieves all facts belonging to the SEC Network.</p>
+ :
+ : @param $networks a sequence of SEC Network objects.
+ : @param $options <a href="core#standard_options">standard SEC BizQL options</a>.
+ :
+ : @return a array of arrays filled with fact values.
+ :)
+declare function sec-networks:fact-tables(
+    $networks as object*,
+    $options as object?
+)
+as array
+{
+  for $component as object in $networks
+  for $table as string? allowing empty in sec-networks:table-names($component)[$$ ne "xbrl28:ImpliedTable"]
+  let $hypercube as object? := hypercubes:hypercubes-for-components($component, $table)
+  let $hypercube as object := if (exists($hypercube))
+                              then $hypercube
+                              else sec:dimensionless-hypercube({
+                                  Concepts: [ sec-networks:line-items($component).Name ]
+                              })
+  return hypercubes:fact-table-for-hypercube(
+      $hypercube,
+      $component.Archive,
+      {|
+        $options,
+        { "facts-for-archives-and-concepts": sec:facts-for-archives-and-concepts#3 }
+      |}
+  )
+};
+
+(:~
+ :
+ : <p>Retrieves all facts belonging to the SEC Networks and populates the model structures.</p>
+ :
+ : @param $networks-or-ids a sequence of SEC Network objects, or their XBRL Component IDs.
+ : @param $options <a href="core#standard_options">standard SEC BizQL options</a>.
+ :
+ : @return the populated model structures (Facts array fields).
+ :)
+declare function sec-networks:populated-model-structures(
+    $networks-or-ids as item*,
+    $options as object?
+)
+as object*
+{
+  let $fact-table-by-concepts := {|
+    for $f in sec-networks:facts($networks-or-ids, $options)
+    group by $concept := $f.Aspects."xbrl:Concept"
+    return { $concept : [ $f ] }
+  |}
+  return
+    copy $result := sec-networks:model-structures($networks-or-ids)
+    modify
+      for $concept in ($result, descendant-objects(values($result)))[$$.Kind eq "Concept"]
+      let $name := $concept.Name
+      return insert json { "Facts" : $fact-table-by-concepts.$name } into $concept
+    return $result
 };
 
 (:~
@@ -600,15 +988,15 @@ declare function sec-networks:summaries($networks as object*) as object*
     NetworkIdentifier : $component.Role,
     Category : sec-networks:categories($component),
     SubCategory : sec-networks:sub-categories($component),
-    Table : components:hypercubes($component)[1],
+    Table : sec-networks:table-names($component)[1],
     Disclosure : sec-networks:disclosures($component),
-    ReportElements : components:num-report-elements($component),
-    Tables : components:num-hypercubes($component),
-    Axis : components:num-dimensions($component),
-    Members : components:num-members($component),
-    LineItems : components:num-line-items($component),
-    Concepts : components:num-concepts($component),
-    Abstracts : components:num-abstracts($component)
+    ReportElements : sec-networks:num-report-elements($component),
+    Tables : sec-networks:num-tables($component),
+    Axis : sec-networks:num-axes($component),
+    Members : sec-networks:num-members($component),
+    LineItems : sec-networks:num-line-items($component),
+    Concepts : sec-networks:num-concepts($component),
+    Abstracts : sec-networks:num-abstracts($component)
   }
 };
 

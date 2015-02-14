@@ -46,7 +46,7 @@ gulp.task('server:dev', function() {
     gulp.watch(Config.paths.html, reload);
     gulp.watch(Config.paths.sass, ['sass', reload]);
     gulp.watch(Config.paths.js, reload);
-    gulp.watch(Config.paths.json, ['jsonlint', reload]);
+    gulp.watch(Config.paths.json, ['jsonlint']);
     $28.watchJSONiqQueries();
 });
 
@@ -63,8 +63,7 @@ gulp.task('webdriver:update', webdriverUpdate);
 
 // Run e2e tests using protractor, make sure serve task is running.
 gulp.task('test:e2e', ['webdriver:update'], function() {
-  var configFile = Config.paths.protractorConfigLocal;
-  //var configFile = Config.isOnTravis ? Config.paths.protractorConfigTravis : Config.paths.protractorConfigLocal;
+  var configFile = Config.isOnTravis ? Config.paths.protractorConfigTravis : Config.paths.protractorConfigLocal;
   var args = [];
   if(Config.isOnTravis && !Config.isOnProduction) {
       args.push('--baseUrl');

@@ -5,7 +5,7 @@ import module namespace config = "http://apps.28.io/config";
   <Entity>
     <Archives>{
       "http://" || request:server-name() || ":" || request:server-port() ||
-       "/v1/_queries/public/api/filings.jq?_method=POST&token=" || $config:test-token || "&eid=http%3A%2F%2Fdisclosure.edinet-fsa.go.jp%20E01225-000&eid=http%3A%2F%2Finfo.edinet-fsa.go.jp%20E01225-000&eid=http%3A%2F%2Fwww.tse.or.jp%2Fsicc%2054010&format=xml&profile-name=japan&fiscalYear=ALL&fiscalPeriod=ALL"
+       "/v1/_queries/public/api/filings.jq?_method=POST&token=" || $config:test-token || "&eid=9cc86b69-59df-4172-8999-fc9b680fd948&eid=http%3A%2F%2Fdisclosure.edinet-fsa.go.jp%20E01225-000&eid=http%3A%2F%2Finfo.edinet-fsa.go.jp%20E01225-000&eid=http%3A%2F%2Fwww.tse.or.jp%2Fsicc%2054010&format=xml&profile-name=japan&fiscalYear=ALL&fiscalPeriod=ALL"
     }</Archives>
     <EIDs>
       <EID>http://disclosure.edinet-fsa.go.jp E01225-000</EID>
@@ -13,9 +13,8 @@ import module namespace config = "http://apps.28.io/config";
       <EID>http://www.tse.or.jp/sicc 54010</EID>
     </EIDs>
     <Name>FSA</Name>
-    <TDNETCode>54010</TDNETCode>
+    <EntityCode>E01225</EntityCode>
     <EDINETCode>E01225</EDINETCode>
-    <EntityKind>Company</EntityKind>
     <SubmitterName>新日鐵住金株式会社</SubmitterName>
     <SubmitterNameAlphabetic>NIPPON STEEL &amp; SUMITOMO METAL CORPORATION</SubmitterNameAlphabetic>
     <SubmitterNamePhonetic>シンニッテツスミキンカブシキガイシャ</SubmitterNamePhonetic>

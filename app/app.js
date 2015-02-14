@@ -19,8 +19,7 @@ angular.module('report-editor', [
     'forms-ui',
     'layoutmodel',
     'ngSanitize',
-    'angularFileUpload',
-    'chart.js'
+    'angularFileUpload'
 ])
 
 .factory('ConnectionHandler', function($q, $rootScope, DEBUG){
@@ -84,7 +83,7 @@ angular.module('report-editor', [
     $rootScope.$on('auth', function() {
         Session.redirectToLoginPage();
     });
-
+    
     $rootScope.$on('alert', function(event, title, message){
         $modal.open( {
             template: '<div class="modal-header"><span ng-bind-html="object.title"></span><a class="close" ng-click="cancel()">&times;</a></div><div class="modal-body" ng-bind-html="object.message"></div><div class="text-right modal-footer"><button class="btn btn-default" ng-click="cancel()">OK</button></div>',

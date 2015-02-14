@@ -17,7 +17,6 @@ declare  %rest:case-insensitive %rest:distinct  variable $ticker        as strin
 declare  %rest:case-insensitive %rest:distinct  variable $sic           as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalYear    as string* external := "ALL";
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalPeriod  as string* external := "ALL";
-declare  %rest:case-insensitive %rest:distinct  variable $filingKind    as string* external := ();
 declare  %rest:case-insensitive %rest:distinct  variable $aid           as string* external;
 declare  %rest:case-insensitive                 variable $profile-name  as string  external := $config:profile-name;
 
@@ -49,7 +48,6 @@ let $archives as object* := multiplexer:filings(
   $entities,
   $fiscalPeriod,
   $fiscalYear,
-  $filingKind,
   $aid)
 
 

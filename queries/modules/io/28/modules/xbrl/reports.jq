@@ -15,7 +15,7 @@ jsoniq version "1.0";
  : with an RID (Report schema ID).</p>
  :
  : <p>With this module, you can retrieve facts belonging to a report.
- : The concept map network will be used
+ : The concept map network will be used 
  : by default to map the report's concepts to reported concepts.</p>
  :
  : <p>Reports are stored in the collection reports in
@@ -32,6 +32,8 @@ jsoniq version "1.0";
 module namespace reports = "http://28.io/modules/xbrl/reports";
 
 import module namespace networks = "http://28.io/modules/xbrl/networks";
+import module namespace concepts = "http://28.io/modules/xbrl/concepts";
+import module namespace components = "http://28.io/modules/xbrl/components";
 
 declare namespace ver = "http://zorba.io/options/versioning";
 declare option ver:module-version "1.0";
@@ -43,9 +45,9 @@ declare variable $reports:col as string := "reports";
 
 (:~
  : <p>Retrieves all reports.</p>
- :
+ : 
  : @return all reports.
- :)
+ :) 
 declare function reports:reports() as object*
 {
   collection($reports:col)
@@ -56,11 +58,11 @@ declare function reports:reports() as object*
  :
  : @param $reports-or-ids the report ids (RIDs) or the
  : reports themselves.
- :
- : @return the reports with the given RIDs or the
+ : 
+ : @return the reports with the given RIDs or the 
  :   empty sequence if no report was found or the input
  : is an empty sequence.
- :)
+ :) 
 declare function reports:reports($reports-or-ids as item*) as object*
 {
   let $ids as string* :=
@@ -75,23 +77,53 @@ declare function reports:reports($reports-or-ids as item*) as object*
     (
       $schemas,
       if (exists($ids))
-      then find($reports:col,
+      then find($reports:col, 
                 { "_id" : { "$in" : [ distinct-values($ids) ! reports:rid($$) ] } } )
       else ()
     )
 };
 
 (:~
+ : <p>Return the concepts contained in reports.</p>
+ :
+ : @param $reports-or-ids the report ids (RIDs) or the
+ : reports themselves.
+ : 
+ : @return the concepts from the reports in the same layout 
+ : as the concepts module would provide
+ :) 
+declare function reports:concepts($reports-or-ids as item*) as object*
+{
+  let $reports as object* := reports:reports($reports-or-ids)
+  for $report in $reports
+  let $language as string := concepts:normalize-language(( $report.$components:DEFAULT-LANGUAGE , $concepts:AMERICAN_ENGLISH )[1])
+  let $role as string := ( $report.Role, $concepts:DEFAULT_COMPONENT_LINK_ROLE )[1]
+  let $report-concepts as object* := $report.Concepts[]
+  for $report-concept in $report-concepts
+  return
+    {
+      Role: $role,
+      Name: $report-concept.Name,
+      Labels: {
+        $concepts:STANDARD_LABEL_ROLE: {
+          $language: $report-concept.Label
+        }
+      }
+    }
+};
+
+
+(:~
  : <p>Adds the given report to the database.</p>
  :
  : @param $report the report schema to add.
- :
+ : 
  : @return the empty sequence.
  :
  : @error reports:INVALID-REPORT if the given report object does not
  :   contain a name field
  : @error reports:EXISTS if a report with the given name already exists
- :)
+ :) 
 declare %an:sequential function reports:add($report as object) as ()
 {
   if (empty($report._id))
@@ -110,13 +142,13 @@ declare %an:sequential function reports:add($report as object) as ()
  : <p>Replaces a report in the database with the given report.
  : The report to be replaced is identified by the value of the _id
  : field of the given schema (RID).</p>
- :
+ : 
  : @param $report the new report
- :
+ : 
  : @return the empty sequence
  :
  : @error reports:DOES-NOT-EXIST if a report with the given name does not exist.
- :)
+ :) 
 declare %an:sequential function reports:update($report as object)
 as ()
 {
@@ -129,13 +161,13 @@ as ()
 
 (:~
  : <p>Deletes a report from the database.</p>
- :
+ : 
  : @param $report-or-id the report to delete or its RID.
  :
  : @return the empty sequence.
  :
  : @error report:DOES-NOT-EXIST if no report with the given RID exists.
- :)
+ :) 
 declare %an:sequential function reports:delete($report-or-id as item)
 as ()
 {
@@ -165,7 +197,7 @@ declare function reports:rid($report-or-id as item) as atomic
     let $rid := $report-or-id._id
     return if(exists($rid))
            then $rid
-           else error(QName("reports:INVALID_PARAMETER"),
+           else error(QName("reports:INVALID_PARAMETER"), 
                       "report does not contain mandatory _id field.")
   case $rid as atomic return $rid
   default return error(

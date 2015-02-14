@@ -1,5 +1,5 @@
 # CellStore
-[![Circle CI](https://circleci.com/gh/28msec/cellstore.svg?style=svg)](https://circleci.com/gh/28msec/cellstore)
+[![Build Status](http://img.shields.io/travis/28msec/cellstore/master.svg?style=flat)](https://travis-ci.org/28msec/cellstore)
 
 In traditional data warehousing, it takes months for the IT department to build a single hypercube. 
 With the CellStore, it takes minutes for the business users to build an infinite number of hypercubes.

@@ -3,11 +3,10 @@ jsoniq version "1.0";
 module namespace resolution = "http://28.io/modules/xbrl/resolution";
 
 import module namespace components = "http://28.io/modules/xbrl/components";
-import module namespace labels = "http://28.io/modules/xbrl/labels";
+import module namespace concepts = "http://28.io/modules/xbrl/concepts";
 import module namespace facts = "http://28.io/modules/xbrl/facts";
 import module namespace hypercubes = "http://28.io/modules/xbrl/hypercubes";
 import module namespace networks = "http://28.io/modules/xbrl/networks";
-import module namespace entities = "http://28.io/modules/xbrl/entities";
 
 (: TODOs
 - Options for relationship networks (formulaAxis, depth)
@@ -117,6 +116,32 @@ declare %private function resolution:convert-definition-nodes(
 };
 
 (:~
+ : Retrieves the labels from the components' cache (default language)
+ : or from the remove collection cache.
+ :
+ : @param $concept-names a sequence of concept names.
+ : @param $components a sequence of components
+ : @param $label-role the desired label role
+ : @param $options the options object
+ :
+ : @return the labels
+ :)
+declare %private function resolution:labels(
+    $concept-names as string*,
+    $components as object*,
+    $label-role as string,
+    $options as object?) as string*
+{
+  concepts:labels(
+    $concept-names,
+    $label-role,
+    ($options.Language, "en")[1],
+    $components.Concepts[],
+    $options
+  )
+};
+
+(:~
  : Converts a rule definition node to one or more structural nodes.
  : A rule node restricts a dimension to a value.
  :
@@ -140,16 +165,11 @@ declare %private function resolution:convert-rule-node(
 
     let $labels := (
         $definition-node.Labels[],
-        values(
-          labels:labels(
+        resolution:labels(
             $main-string-members,
-            $labels:STANDARD_LABEL_ROLE,
-            ($options.Language, $components.$components:DEFAULT-LANGUAGE, "en")[1],
-            $components.Concepts[],
-            (),
-            $options
-          )
-       )
+            $components,
+            $concepts:STANDARD_LABEL_ROLE,
+            $options)
     )
 
     let $children := resolution:convert-definition-nodes(
@@ -322,14 +342,11 @@ declare %private function resolution:expand-concept-network(
         if(every $language in $default-languages satisfies $language eq $options.Language)
         then $network.Label
         else
-          labels:labels(
+        resolution:labels(
             $concept,
-            ($network.PreferredLabelRole, $labels:STANDARD_LABEL_ROLE)[1],
-            ($options.Language, $components.$components:DEFAULT-LANGUAGE, "en")[1],
-            $components.Concepts[],
-            (),
-            $options
-          ).$concept
+            $components,
+            ($network.PreferredLabelRole, $concepts:STANDARD_LABEL_ROLE)[1],
+            $options)
     return
     {|
         {
@@ -436,14 +453,11 @@ declare function resolution:expand-dimension-network(
     let $value as string := $network.Name
     let $labels as string* :=
           if($options.Language != $components.$components:DEFAULT-LANGUAGE)
-          then labels:labels(
+          then resolution:labels(
             $value,
-            ($network.PreferredLabelRole, $labels:STANDARD_LABEL_ROLE)[1],
-            ($options.Language, $components.$components:DEFAULT-LANGUAGE, "en")[1],
-            $components.Concepts[],
-            (),
-            $options
-          ).$value
+            $components,
+            ($network.PreferredLabelRole, $concepts:STANDARD_LABEL_ROLE)[1],
+            $options)
           else $network.Label
     return
     {|
@@ -601,8 +615,6 @@ declare function resolution:resolve(
         if(exists($options.Hypercube))
         then $options.Hypercube
         else values($components.Hypercubes)
-    let $entities as object* :=
-      entities:entities($definition-model.TableFilters."xbrl:Entity")
     return {
         ModelKind: "StructuralModel",
         TableSetLabels: $definition-model.Labels,
@@ -629,27 +641,22 @@ declare function resolution:resolve(
         GlobalConstraintSet: $definition-model.TableFilters,
         GlobalConstraintLabels: {|
             for $dimension in keys($definition-model.TableFilters)
-            let $dimension-labels as string* :=
-                labels:labels(
-                  $dimension,
-                  ($labels:STANDARD_LABEL_ROLE, $labels:VERBOSE_LABEL_ROLE),
-                  ($options.Language, $components.$components:DEFAULT-LANGUAGE, "en")[1],
-                  $components.Concepts[],
-                  (),
-                  $options
-                ).$dimension
+            let $dimension-labels as string* := (
+                resolution:labels(
+                  $dimension, $components, $concepts:STANDARD_LABEL_ROLE, $options),
+                resolution:labels(
+                  $dimension, $components, $concepts:VERBOSE_LABEL_ROLE, $options
+                )
+            )
             let $value := $definition-model.TableFilters.$dimension
             let $value-labels as string* :=
               if($value instance of string)
-              then
-                labels:labels(
-                  $value,
-                  ($labels:STANDARD_LABEL_ROLE, $labels:VERBOSE_LABEL_ROLE),
-                  ($options.Language, $components.$components:DEFAULT-LANGUAGE, "en")[1],
-                  $components.Concepts[],
-                  $entities,
-                  $options
-                ).$value
+              then (
+                resolution:labels(
+                  $value, $components, $concepts:VERBOSE_LABEL_ROLE, $options),
+                resolution:labels(
+                  $value, $components, $concepts:STANDARD_LABEL_ROLE, $options)
+              )
               else ()
             return ({ $dimension: $dimension-labels[1] }[exists($dimension-labels)],
                     { $value: $value-labels[1] }[exists($value-labels)]

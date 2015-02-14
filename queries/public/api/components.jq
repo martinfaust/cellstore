@@ -56,7 +56,6 @@ declare  %rest:case-insensitive %rest:distinct  variable $ticker             as 
 declare  %rest:case-insensitive %rest:distinct  variable $sic                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalYear         as string* external := "LATEST";
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalPeriod       as string* external := "FY";
-declare  %rest:case-insensitive %rest:distinct  variable $filingKind         as string* external := ();
 declare  %rest:case-insensitive %rest:distinct  variable $eid                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $aid                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $networkIdentifier  as string* external;
@@ -98,7 +97,6 @@ let $archives as object* := multiplexer:filings(
   $entities,
   $fiscalPeriod,
   $fiscalYear,
-  $filingKind,
   $aid)
 
 let $entities as object*  := entities:entities($archives.Entity)
@@ -110,9 +108,7 @@ let $components as object* :=
       $reportElement,
       $disclosure,
       $networkIdentifier,
-      $label[$profile-name ne "sec"],
-      $label[$profile-name eq "sec"]
-    )
+    $label)
 
 let $res as object* :=
     switch($profile-name)
@@ -159,11 +155,10 @@ let $res as object* :=
            }
     default return
         for $r in $components
-        return {|
-          {
+        return {
             Archive: $r.Archive,
-            Label: $r.Label,
             Role: $r.Role,
+            Label: $r.Label,
             FactTable: backend:url("facttable-for-component", {
                             token: $token,
                             aid: $r.Archive,
@@ -188,19 +183,14 @@ let $res as object* :=
                             profile-name: $profile-name
                         }),
             NumRules: size($r.Rules),
-            NumNetworks: components:num-networks($r),
-            NumReportElements: components:num-report-elements($r),
-            NumHypercubes: components:num-hypercubes($r),
-            NumDimensions: components:num-dimensions($r),
-            NumMembers: components:num-members($r),
-            NumLineItems: components:num-line-items($r),
-            NumAbstracts: components:num-abstracts($r),
-            NumConcepts: components:num-concepts($r),
+            NumNetworks: size($r.Networks),
+            NumReportElements: size($r.Concepts),
+            NumHypercubes: count(keys($r.Hypercubes)),
+            NumDimensions: count(components:dimensions($r)),
+            NumConcepts: count(components:concrete-concepts($r)),
             Hypercubes: [ keys($r.Hypercubes) ],
             ValidationErrors: [ components:validation-errors($r) ]
-          },
-          { Disclosure: $r.Profiles.FSA.Disclosure}[$profile-name eq "japan"]
-        |}
+        }
 let $result := switch($profile-name)
                case "sec"
                return { Archives: [ $res ] }

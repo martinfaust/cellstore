@@ -38,11 +38,11 @@ declare %an:sequential function local:test-filings-generic($expected as array, $
 
 declare %an:nondeterministic function local:test-example1() as item
 {
-  let $expected :=
+  let $expected := 
     [
         {
             "AccessionNumber": "0001104659-14-009773",
-            "Components" : "http://" || request:server-name() || ":" || request:server-port() || "/v1/_queries/public/api/components.jq?_method=POST&token=" || $config:test-token || "&aid=0001104659-14-009773&format=&profile-name=sec",
+            "Components" : "http://" || request:server-name() || ":" || request:server-port() || "/v1/_queries/public/api/components.jq?_method=POST&token=" || $config:test-token || "&aid=0001104659-14-009773&format=&profile-name=sec", 
             "CIK": "http://www.sec.gov/CIK 0000066740",
             "EntityRegistrantName": "3M CO",
             "FormType": "10-K",
@@ -52,19 +52,19 @@ declare %an:nondeterministic function local:test-example1() as item
             "Generator": "IBM Cognos",
             "SECFilingPage": "http://www.sec.gov/Archives/edgar/data/66740/000110465914009773/0001104659-14-009773-index.htm",
             "XBRLInstanceURL": "http://www.sec.gov/Archives/edgar/data/66740/000110465914009773/mmm-20131231.xml",
-            "Networks" : 175,
-            "ReportElements" : 1203, 
-            "Tables" : 29,
-            "Axis" : 44,
-            "Members" : 276,
-            "LineItems" : 29,
-            "Concepts" : 720,
-            "Abstracts" : 76,
-            "Footnotes" : 0,
-            "Facts" : 3506,
-            "ExtensionFacts" : 1180,
-            "ExtensionConcepts" : 184,
-            "ExtensionAbstracts" : 175
+            "Networks": 104,
+            "ReportElements": 1192,
+            "Tables": 52,
+            "Axis": 35,
+            "Members": 239,
+            "LineItems": 29,
+            "Concepts": 720,
+            "Abstracts": 443,
+            "Footnotes": 0,
+            "Facts": 3506,
+            "ExtensionFacts": 1180,
+            "ExtensionConcepts": 184,
+            "ExtensionAbstracts": 164
         }
     ]
     let $endpoint := "filings"

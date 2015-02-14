@@ -10,7 +10,7 @@ var knownOptions = {
     string: [ 'build-id', 'config', 'specs' ],
     default: {
         'build-id': process.env.CELLSTORE_BUILD_ID !== undefined ? process.env.CELLSTORE_BUILD_ID : process.env.RANDOM_ID,
-        'config': ( process.env.CIRCLE_BRANCH !== undefined && fs.existsSync('config/' + process.env.CIRCLE_BRANCH + '.json.enc') ) ? process.env.CIRCLE_BRANCH : process.env.CELLSTORE_CONFIG
+        'config': ( process.env.TRAVIS_BRANCH !== undefined && fs.existsSync('config/' + process.env.TRAVIS_BRANCH + '.json.enc') ) ? process.env.TRAVIS_BRANCH : process.env.CELLSTORE_CONFIG
     }
 };
 
@@ -36,14 +36,14 @@ if(!fs.existsSync(encryptedConfigFile)){
     throw new $.util.PluginError(__filename, msg);
 }
 
-var isOnTravis = process.env.CIRCLECI === 'true';
+var isOnTravis = process.env.TRAVIS_BUILD_ID !== undefined;
 // if a config/<branch>.json.enc exists we are on a production deployment branch
-var isProd = fs.existsSync('config/' + process.env.CIRCLE_BRANCH + '.json.enc');
-var isOnTravisAndProd = isOnTravis && isProd && process.env.CI_PULL_REQUEST === '';
+var isProd = fs.existsSync('config/' + process.env.TRAVIS_BRANCH + '.json.enc');
+var isOnTravisAndProd = isOnTravis && isProd && process.env.TRAVIS_PULL_REQUEST === 'false';
 
-if(isOnTravisAndProd && process.env.CIRCLE_BRANCH !== configId){
+if(isOnTravisAndProd && process.env.TRAVIS_BRANCH !== process.env.CELLSTORE_CONFIG){
     $.util.log('We are on Travis and on a Production branch.');
-    $.util.log('Current production branch "' + process.env.CIRCLE_BRANCH + '" doesn\'t match cellstore configuration "' + configId + '"');
+    $.util.log('Current production branch "' + process.env.TRAVIS_BRANCH + '" doesn\'t match cellstore configuration "' + process.env.CELLSTORE_CONFIG + '"');
     $.util.log($.util.colors.green('Nothing to do!'));
     process.exit(0);
 }

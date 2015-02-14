@@ -46,7 +46,9 @@ declare %an:nondeterministic function local:test-labels() as item
     let $res as object := test:invoke-raw($endpoint, $params)
     let $actual := $res.body.content
     let $expectedLines := (
-        "SEC Acceptance Date [Axis],Archive [Axis],Fiscal Period [Axis],Fiscal Year [Axis],Fiscal Period Type [Axis],Period [Axis],Reporting Entity [Axis],Concept [Axis],Legal Entity [Axis],Unit,Value,Decimals\r\n20131024121047,0000021344-13-000050,Q3,2013,instant,\"September 27, 2013\",COCA COLA CO,\"Cash and Cash Equivalents, at Carrying Value\",Default Legal Entity [Member],USD,11118000000,-6\r\n20131024121047,0000021344-13-000050,Q3,2013,instant,\"September 27, 2013\",COCA COLA CO,Assets,Default Legal Entity [Member],USD,89432000000,-6\r\n"
+        "Accession Number,Concept,Entity,Period,Fiscal Period,Fiscal Period Type,Fiscal Year,Accepted,Legal Entity,Unit,Value,Decimals",
+        "0000021344-13-000050,\"Cash and Cash Equivalents, at Carrying Value\",COCA COLA CO,2013-09-27,Q3,instant,2013,20131024121047,Default Legal Entity,USD,11118000000,-6",
+        "0000021344-13-000050,Assets,COCA COLA CO,2013-09-27,Q3,instant,2013,20131024121047,Default Legal Entity,USD,89432000000,-6"
     )
     return if($res.status eq 200 and (every $line in $expectedLines satisfies contains($actual,$line))) then true else {
         url: test:url($endpoint, $params),
@@ -60,7 +62,7 @@ declare %an:nondeterministic function local:test-labels-aids() as item
     let $endpoint := "facts"
     let $params := {
         concept: "disc:AdvertisingCostsPolicyTextBlock",
-        report: "Disclosures",
+        map: "Disclosures",
         format: "json",
         fiscalYear: 2014,
         fiscalPeriod: "FY",
@@ -72,7 +74,7 @@ declare %an:nondeterministic function local:test-labels-aids() as item
             for $labels in $res[2].FactTable[].Labels
             return (keys($labels) ! $labels.$$)
         ]
-    let $expected := [ "Archive [Axis]", "SEC Acceptance Date [Axis]", "Fiscal Year [Axis]", "Non-Numeric [Member]", "Default Legal Entity [Member]", "Unit [Axis]", "Advertising Costs, Policy", "Fiscal Period [Axis]", "Concept [Axis]", "Reporting Entity [Axis]", "Legal Entity [Axis]", "Fiscal Period Type [Axis]", "Period [Axis]", "CISCO SYSTEMS, INC." ]
+    let $expected := [ "Advertising Costs, Policy", "Default Legal Entity", "Accession Number", "Concept", "Entity", "CISCO SYSTEMS, INC.", "Period", "Fiscal Period", "Fiscal Period Type", "Fiscal Year", "Accepted", "Unit", "Legal Entity" ]
     let $status as integer := $res[1]
     return test:assert-eq-array($expected, $actual, $status, test:url($endpoint, $params))
 };
@@ -149,7 +151,7 @@ local:check({
         concept: "disc:AssetRetirementObligationsPolicy",
         fiscalPeriod: "Q3",
         fiscalYear: "2013",
-        map: "Disclosures"
+        map: "Disclosures"                        
     }),
     quartersfact2: local:test-facttable(1, {
         aid: "0001193125-12-207154",

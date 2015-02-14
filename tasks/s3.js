@@ -32,29 +32,6 @@ var init = function() {
     s3 = new AWS.S3(config);
 };
 
-var checkWebsiteAvailable = function(){
-    var defered = Q.defer();
-    var url = 'http://' + bucketName + '.s3-website-' + region + '.amazonaws.com';
-    var request = require('request');
-    request({
-        uri: url,
-        method: 'GET'
-    }, function(error, response){
-        if(!error && response.statusCode === 200){
-            $.util.log('Website available at: ' + $.util.colors.green(url));
-            defered.resolve();
-        } else {
-            if(error){
-                $.util.log('checkWebsiteAvailable(' + url + '): ' + $.util.colors.red(error));
-            } else {
-                $.util.log('checkWebsiteAvailable(' + url + ') status: ' + $.util.colors.red(response.statusCode));
-            }
-            defered.reject();
-        }
-    });
-    return defered.promise;
-};
-
 var makeBucketWebsite = function() {
     var defered = Q.defer();
     s3.putBucketWebsite(
@@ -63,11 +40,12 @@ var makeBucketWebsite = function() {
             WebsiteConfiguration : Config.credentials.s3.website
         }, function(err) {
             if (err) {
-                $.util.log('putBucketWebsite(' + bucketName + '): ' + $.util.colors.red(err));
+                $.util.log('putBucketWebsite(' + bucketName + '): ' + err);
                 defered.reject();
             }
             else {
                 $.util.log('putBucketWebsite(' + bucketName + ')');
+                $.util.log('Website available at http://' + bucketName + '.s3-website-' + region + '.amazonaws.com/');
                 defered.resolve();
             }
         }
@@ -104,7 +82,7 @@ var listObjects = function (idempotent, prefix, marker, contents) {
             if(idempotent) {
                 defered.resolve();
             } else {
-                defered.reject(new Error('Failed to list content of bucket ' + bucketName + '\n' + $.util.colors.red(err)));
+                defered.reject(new Error('Failed to list content of bucket ' + bucketName + '\n' + err));
             }
         }
     });
@@ -138,7 +116,7 @@ var createBucket = function() {
             defered.reject();
         } else {
             $.util.log('createBucket(' + bucketName + ')');
-            defered.resolve();
+            return waitForBucketExists();
         }
     });
     return defered.promise;
@@ -197,7 +175,6 @@ gulp.task('s3-setup', function() {
     if(!Config.isOnProduction) {
         return deleteBucket(idempotent)
         .then(createBucket)
-        .then(waitForBucketExists)
         .then(makeBucketWebsite)
         .then(function(){
             var defered = Q.defer();
@@ -209,7 +186,6 @@ gulp.task('s3-setup', function() {
                     .on('end', defered.resolve);
             return defered.promise;
         })
-        .then(checkWebsiteAvailable)
         .catch(function(error){
             $.util.log($.util.colors.red('Error while doing the s3 setup'));
             $.util.log(error);

@@ -7,7 +7,6 @@ import module namespace hypercubes = "http://28.io/modules/xbrl/hypercubes";
 import module namespace reports = "http://28.io/modules/xbrl/reports";
 import module namespace concepts = "http://28.io/modules/xbrl/concepts";
 import module namespace facts = "http://28.io/modules/xbrl/facts";
-import module namespace labels = "http://28.io/modules/xbrl/labels";
 import module namespace rules = "http://28.io/modules/xbrl/rules";
 import module namespace components = "http://28.io/modules/xbrl/components";
 import module namespace entities = "http://28.io/modules/xbrl/entities";
@@ -17,25 +16,6 @@ import module namespace sec = "http://28.io/modules/xbrl/profiles/sec/core";
 import module namespace multiplexer = "http://28.io/modules/xbrl/profiles/multiplexer";
 
 import module namespace request = "http://www.28msec.com/modules/http-request";
-
-declare variable $local:additional-concepts as object* := (
-  {
-    Name: "sec:DefaultLegalEntity",
-    Labels : [ {
-        Role : "http://www.xbrl.org/2003/role/label",
-        Language : "en-us",
-        Value : "Default Legal Entity [Member]"
-    } ]
-  },
-  {
-    Name: "xbrl:NonNumeric",
-    Labels : [ {
-        Role : "http://www.xbrl.org/2003/role/label",
-        Language : "en-us",
-        Value : "Non Numeric"
-    } ]
-  }
-);
 
 declare function local:param-values(
     $name as string,
@@ -106,10 +86,6 @@ declare function local:param-values(
      return ($fiscalPeriodType, request:param-values("fsa:FiscalPeriodType"))
      case $name eq "fsa:FiscalPeriodType::type" and $profile-name eq "japan"
      return "string"
-     case $name eq "fsa:ArchiveFiscalYear::type" and $profile-name eq "japan"
-     return "integer"
-     case $name eq "fsa:ArchiveFiscalPeriod::type" and $profile-name eq "japan"
-     return "string"
 
      default return request:param-values($name)
 };
@@ -129,8 +105,7 @@ declare function local:param-names() as string*
         "sec:FiscalPeriod"[$profile-name eq "sec"],
         "sec:FiscalPeriodType"[$profile-name eq "sec"],
         "sec:FiscalYear"[$profile-name eq "sec"],
-        "xbrl:Entity"[$profile-name eq "sec" and
-                      $names = ("cik", "tag", "ticker", "sic")],
+        "xbrl:Entity"[$profile-name eq "sec" and $names = ("cik", "tag", "ticker", "sic")],
         "dei:LegalEntityAxis"[$profile-name eq "sec"],
         "dei:LegalEntityAxis::default"[$profile-name eq "sec"],
 
@@ -138,9 +113,7 @@ declare function local:param-names() as string*
         "fsa:Submitted"[$profile-name eq "japan"],
         "fsa:FiscalPeriod"[$profile-name eq "japan"],
         "fsa:FiscalPeriodType"[$profile-name eq "japan"],
-        "fsa:FiscalYear"[$profile-name eq "japan"],
-        "xbrl:Entity"[$profile-name eq "japan" and
-                      $names = ("edinetcode", "tag", "ticker")]
+        "fsa:FiscalYear"[$profile-name eq "japan"]
     ))
 };
 
@@ -220,7 +193,6 @@ declare  %rest:case-insensitive                 variable $validate          as b
 declare  %rest:case-insensitive                 variable $labels            as boolean external := false;
 declare  %rest:case-insensitive                 variable $additional-rules  as string? external;
 declare  %rest:case-insensitive                 variable $debug             as boolean external := false;
-declare  %rest:case-insensitive                 variable $language          as string  external := "en-US";
 
 session:audit-call($token);
 
@@ -280,31 +252,30 @@ let $facts :=
   then $facts
   else
     let $archives as string* := distinct-values($facts.Aspects."xbrl28:Archive")
-    let $concept-names as string* := (
-      distinct-values((keys($facts.Aspects), values($facts.Aspects)[$$ instance of string]))
-    )
+    let $concept-names as string* := distinct-values($facts.Aspects."xbrl:Concept")
     let $concepts as object* :=
       (
           concepts:concepts($concept-names, $archives, $concepts:ANY_COMPONENT_LINK_ROLE),
-          $report.Concepts[][$$.Name = $concept-names],
-          if($profile-name eq "sec") then $local:additional-concepts else ()
+          (reports:concepts(($report,$map)))[$$.Name = $concept-names]
       )
-    let $language as string := ( $language, $report.$components:DEFAULT-LANGUAGE , $labels:AMERICAN_ENGLISH )[1]
+    let $language as string := ( $report.$components:DEFAULT-LANGUAGE , $concepts:AMERICAN_ENGLISH )[1]
+    let $roles as string* := ( $report.Role, $concepts:ANY_COMPONENT_LINK_ROLE )
     let $nonFetchedEntities as string* := request:param-values("xbrl:Entity")[not $$ = entities:eid($entities)]
     let $entities as object* := ($entities, entities:entities($nonFetchedEntities))
     for $fact as object in $facts
+    let $entityName as string :=
+        switch(true)
+        case $profile-name eq "sec" return
+            $entities[entities:eid($$) = $fact.Aspects."xbrl:Entity"].Profiles.SEC.CompanyName
+        case $profile-name eq "japan" return
+            $entities[entities:eid($$) = $fact.Aspects."xbrl:Entity"].Profiles.FSA.SubmitterName
+        default return $fact.Aspects."xbrl:Entity"
     return
     {|
       $fact,
-      let $concept-labels as object? := labels:labels-for-facts(
-        $fact,
-        $labels:STANDARD_LABEL_ROLE,
-        $language,
-        $concepts,
-        $entities,
-        ()
-      )
-      return { Labels : $concept-labels }
+      let $concept-labels as object? := facts:labels($fact, $roles, $concepts:STANDARD_LABEL_ROLE, $language, $concepts, ())
+      let $standard-labels as object := conversion:get-standard-labels($fact, $entityName)
+      return { Labels : {| $concept-labels, $standard-labels |} }
     |}
 
 let $facts :=

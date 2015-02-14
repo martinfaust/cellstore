@@ -8,9 +8,11 @@ import module namespace hypercubes = "http://28.io/modules/xbrl/hypercubes";
 import module namespace conversion = "http://28.io/modules/xbrl/conversion";
 import module namespace networks = "http://28.io/modules/xbrl/networks";
 import module namespace concept-maps = "http://28.io/modules/xbrl/concept-maps";
+import module namespace concepts = "http://28.io/modules/xbrl/concepts";
+import module namespace facts = "http://28.io/modules/xbrl/facts";
 import module namespace rules = "http://28.io/modules/xbrl/rules";
-import module namespace labels = "http://28.io/modules/xbrl/labels";
 
+import module namespace sec-networks = "http://28.io/modules/xbrl/profiles/sec/networks";
 import module namespace multiplexer = "http://28.io/modules/xbrl/profiles/multiplexer";
 
 import module namespace config = "http://apps.28.io/config";
@@ -28,7 +30,6 @@ declare  %rest:case-insensitive %rest:distinct  variable $ticker             as 
 declare  %rest:case-insensitive %rest:distinct  variable $sic                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalYear         as string* external := "LATEST";
 declare  %rest:case-insensitive %rest:distinct  variable $fiscalPeriod       as string* external := "FY";
-declare  %rest:case-insensitive %rest:distinct  variable $filingKind         as string* external := ();
 declare  %rest:case-insensitive %rest:distinct  variable $eid                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $aid                as string* external;
 declare  %rest:case-insensitive %rest:distinct  variable $networkIdentifier  as string* external;
@@ -45,7 +46,6 @@ declare  %rest:case-insensitive                 variable $merge              as 
 declare  %rest:case-insensitive                 variable $additional-rules   as string? external;
 declare  %rest:case-insensitive                 variable $profile-name       as string  external := $config:profile-name;
 declare  %rest:case-insensitive %rest:distinct  variable $role               as string* external;
-declare  %rest:case-insensitive                 variable $language           as string  external := "en-US";
 
 session:audit-call($token);
 
@@ -64,7 +64,7 @@ let $cik as string* :=
     default return ()
 
 (: Entity resolution :)
-let $entities as object* := multiplexer:entities(
+let $entities := multiplexer:entities(
   $profile-name,
   $eid,
   $cik,
@@ -77,15 +77,9 @@ let $archives as object* := multiplexer:filings(
   $entities,
   $fiscalPeriod,
   $fiscalYear,
-  $filingKind,
   $aid)
 
-let $entities as object* :=
-    ($entities[entities:eid($$) = $archives.Entity],
-    let $not-found := $archives.Entity[not entities:eid($entities) = $$]
-    where exists($not-found)
-    return entities:entities($not-found))
-
+let $entity    := entities:entities($archives.Entity)
 let $components as object* :=
     multiplexer:components(
       $profile-name,
@@ -94,9 +88,7 @@ let $components as object* :=
       $reportElement,
       $disclosure,
       $networkIdentifier,
-      $label[$profile-name ne "sec"],
-      $label[$profile-name eq "sec"]
-    )
+    $label)
 
 let $component as object? := if($merge) then components:merge($components) else $components[1]
 let $cid as string? := string-join($components ! components:cid($$), "--")
@@ -148,14 +140,8 @@ let $facts :=
         (: if labels are requested by the labels=true parameter then also add labels for concepts :)
         let $concepts as object* := $component.Concepts[]
         for $fact in $facts
-        let $labels := labels:labels-for-facts(
-          $fact,
-          $labels:STANDARD_LABEL_ROLE,
-          $language,
-          $concepts,
-          $entities,
-          ()
-        )
+        let $labels :=
+            facts:labels($fact, $concepts:STANDARD_LABEL_ROLE,$concepts:AMERICAN_ENGLISH, $concepts, ())
         return
             {|
                 trim($fact, "Labels"),
@@ -164,27 +150,29 @@ let $facts :=
 let $facts := api:normalize-facts($facts)
 
 let $result :=
-  if($profile-name eq "sec")
-  then {
-    CIK : entities:eid($entities),
-    EntityRegistrantName : $entities.Profiles.SEC.CompanyName,
-    TableName : components:hypercubes($component),
-    Label : $component.Label,
-    AccessionNumber : $component.Archive,
-    FormType : $archives.Profiles.SEC.FormType,
-    FiscalPeriod : $archives.Profiles.SEC.Fiscal.DocumentFiscalPeriodFocus,
-    FiscalYear : $archives.Profiles.SEC.Fiscal.DocumentFiscalYearFocus,
-    AcceptanceDatetime : ($archives ! filings:acceptance-dateTimes($$)),
-    NetworkIdentifier: $component.Role,
-    Disclosure : $component.Profiles.SEC.Disclosure,
-    FactTable : [ $facts ]
-  } else {
-    Archive : $component.Archive,
-    Role: $component.Role,
-    TableName : keys($component.Hypercubes),
-    Label : $component.Label,
-    FactTable : [ $facts ]
-  }
+        {|
+            {
+                CIK : entities:eid($entity),
+                EntityRegistrantName : $entity.Profiles.SEC.CompanyName,
+                TableName : sec-networks:tables($component, {IncludeImpliedTable: true}).Name,
+                Label : $component.Label,
+                AccessionNumber : $component.Archive,
+                FormType : $archives.Profiles.SEC.FormType,
+                FiscalPeriod : $archives.Profiles.SEC.Fiscal.DocumentFiscalPeriodFocus,
+                FiscalYear : $archives.Profiles.SEC.Fiscal.DocumentFiscalYearFocus,
+                AcceptanceDatetime : ($archives ! filings:acceptance-dateTimes($$)),
+                NetworkIdentifier: $component.Role,
+                Disclosure : $component.Profiles.SEC.Disclosure,
+                FactTable : [ $facts ]
+            }[$profile-name eq "sec"],
+            {
+                Archive : $component.Archive,
+                Role: $component.Role,
+                TableName : keys($component.Hypercubes),
+                Label : $component.Label,
+                FactTable : [ $facts ]
+            }[$profile-name ne "sec"]
+        |}
 
 let $comment := {
     NumFacts : count($facts),

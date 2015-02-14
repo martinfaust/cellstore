@@ -199,19 +199,7 @@ declare %an:sequential function api:csv-to-html(
     $csv as string) as item*
 {
     let $csv as string* := $csv
-    let $rows := tokenize($csv, "\n")
-    let $header := $rows[1]
-    let $body := subsequence($rows, 2)
-    let $display-cell := function($row as string?, $cell-tag-name as string) {
-      for tumbling window $cells as string* in tokenize($row, ",")
-      start $start at $i when true
-      only end $end at $j when not contains(replace($start, "\"\"", ""), "\"") or ($j gt $i and contains(replace($end, "\"\"", ""), "\""))
-      let $cell := replace(string-join($cells, ","), "\"", "")
-      return if(contains($cell, "http://") and (contains($cell, "28.io") or contains($cell, "rendering.secxbrl.info")))
-      then element { $cell-tag-name } { <a href="{$cell}">Link</a> }
-      else element { $cell-tag-name } {$cell}
-    }
-    return <html>
+    return <html xmlns="http://w3.org/1999/xhtml">
       <head>
         <title>Cell Store REST API</title>
         <style>
@@ -225,15 +213,20 @@ declare %an:sequential function api:csv-to-html(
       </head>
       <body>
         <table>
-          <thead>
-	          <tr>{$display-cell($header, "th")}</tr>
-          </thead>
-          <tbody>
           {
-            for $row as string in $body
-            return <tr>{$display-cell($row, "td")}</tr>
+            for $row as string in tokenize($csv, "\n")
+            return <tr>
+              {
+                for tumbling window $cells as string* in tokenize($row, ",")
+                start $start at $i when true
+                only end $end at $j when not contains(replace($start, "\"\"", ""), "\"") or ($j gt $i and contains(replace($end, "\"\"", ""), "\""))
+                let $cell := replace(string-join($cells, ","), "\"", "")
+                return if(contains($cell, "http://") and (contains($cell, "28.io") or contains($cell, "rendering.secxbrl.info")))
+                       then <td><a href="{$cell}">Link</a></td>
+                       else <td>{$cell}</td>
+              }
+            </tr>
           }
-          </tbody>
         </table>
       </body>
     </html>
@@ -294,21 +287,6 @@ declare function api:preprocess-format($format as string?, $request-uri as strin
 declare function api:preprocess-tags($tags as string*) as string*
 {
   distinct-values($tags ! upper-case($$))
-};
-
-declare function api:preprocess-concept-kind($kind as string*) as string*
-{
-  distinct-values(
-    for $kind in $kind
-    return switch(lower-case($kind))
-           case "hypercube" return "Hypercube"
-           case "dimension" return "Dimension"
-           case "member" return "Member"
-           case "lineitems" return "LineItems"
-           case "abstract" return "Abstract"
-           case "concept" return "Concept"
-           default return ()
-  )
 };
 
 declare function api:preprocess-boolean($name as string, $value as string)
